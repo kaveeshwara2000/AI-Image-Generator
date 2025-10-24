@@ -5,7 +5,10 @@ const promptForm = document.querySelector(".prompt-form");
 const modelSelect = document.getElementById("model-select");
 const countSelect = document.getElementById("count-select");
 const ratioSelect = document.getElementById("ratio-select");
-const gridGallery = document.querySelector(".gallery-grid");    
+const gridGallery = document.querySelector(".gallery-grid");
+// removed sensitive token
+
+
 //List of example prompts
 const examplePrompts = [
     "A futuristic cityscape at sunset",
@@ -31,6 +34,65 @@ const toggleTheme = () => {
     themeToggle.querySelector("i").className = isDarkTheme ? "fa-solid fa-sun" : "fa-solid fa-moon";
 }
 
+//Get image dimensions based on selected aspect ratio
+const getImageDimensions = (aspectRatio, baseSize = 512) => {
+    const [width, height] = aspectRatio.split("/").map(Number);
+    const scaleFactor = baseSize / Math.sqrt(width * height);
+
+    let calculatedWidth = Math.round(width * scaleFactor);
+    let calculatedHeight = Math.round(height * scaleFactor);
+
+    //Ensure dimensions are multiples of 16
+    calculatedWidth = Math.round(calculatedWidth / 16) * 16;
+    calculatedHeight = Math.round(calculatedHeight / 16) * 16;
+
+    return { width: calculatedWidth, height: calculatedHeight };
+};
+
+//Update image card with generated image
+const updateImageCard = (imgIndex, imgUrl) => {
+    const imgCard = document.getElementById(`img-card-${imgIndex}`);
+    if (!imgCard) return;
+    imgCard.classList.remove("loading");
+    imgCard.innerHTML = `<img src="${imgUrl}" class="result-img" />
+                    <div class="img-overlay">
+                        <a href="${imgUrl}" class="img-download-btn" download="${Date.now()}.png">
+                          <i class="fa-solid fa-download"></i>  
+                        </a>
+                    </div>`;
+}
+
+const generateImages = async (selectedModel, imageCount, aspectRatio, promptText) => {
+    const MODEL_URL = `https://api-inference.huggingface.co/models/${selectedModel}`;
+    const { width, height } = getImageDimensions(aspectRatio);
+
+    const imagePromises = Array.from({ length: imageCount }, async (_, i) => {
+         try {
+            const response = await fetch(MODEL_URL,{
+                headers: { Authorization: `Bearer ${API_KEY}`,
+                    "content-type": "application/json",
+            },
+            method: "POST",
+            body: JSON.stringify({
+                inputs: promptText,
+                parameters: {width, height},
+                options: { wait_for_model: true, use_cache: false },
+            }),
+        });
+
+        if (!response.ok) throw new Error((await response.json())?.error);
+
+        //Convert response to blob and update image card
+        const result = await response.blob();
+        updateImageCard(i, URL.createObjectURL(result));
+    }catch (error) {
+        console.error(error);
+    }
+    })
+    await Promise.all(imagePromises);
+
+}
+
 //Insert a random example prompt into the input field
 promptBtn.addEventListener("click", () => {
     const prompt = examplePrompts[Math.floor(Math.random() * examplePrompts.length)];
@@ -49,7 +111,6 @@ createImageCards = (selectedModel, imageCount, aspectRatio, promtText) => {
                         <i class="fa-solid fa-triangle-exclamation"></i>
                         <p class="status-text">Generating...</p>
                     </div>
-                    <img src="test.png" class="result-img" />
                 </div>`;
     }
 }
