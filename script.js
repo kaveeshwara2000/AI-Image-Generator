@@ -6,6 +6,7 @@ const modelSelect = document.getElementById("model-select");
 const countSelect = document.getElementById("count-select");
 const ratioSelect = document.getElementById("ratio-select");
 const gridGallery = document.querySelector(".gallery-grid");
+const generateBtn = document.querySelector(".generate-btn");
 // removed sensitive token
 
 
@@ -65,8 +66,11 @@ const updateImageCard = (imgIndex, imgUrl) => {
 const generateImages = async (selectedModel, imageCount, aspectRatio, promptText) => {
     const MODEL_URL = `https://api-inference.huggingface.co/models/${selectedModel}`;
     const { width, height } = getImageDimensions(aspectRatio);
+    generateBtn.setAttribute("disabled", "true");
 
+    //create an array of promises for image generation
     const imagePromises = Array.from({ length: imageCount }, async (_, i) => {
+        //Make API request to generate image
          try {
             const response = await fetch(MODEL_URL,{
                 headers: { Authorization: `Bearer ${API_KEY}`,
@@ -87,10 +91,13 @@ const generateImages = async (selectedModel, imageCount, aspectRatio, promptText
         updateImageCard(i, URL.createObjectURL(result));
     }catch (error) {
         console.error(error);
+        const imgCard = document.getElementById(`img-card-${i}`);
+        imgCard.classList.replace("loading", "error");
+        imgCard.querySelector(".status-text").textContent = "Error generating image";
     }
     })
-    await Promise.all(imagePromises);
-
+    await Promise.allSettled(imagePromises);
+    generateBtn.removeAttribute("disabled");
 }
 
 //Insert a random example prompt into the input field
